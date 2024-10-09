@@ -110,6 +110,7 @@ datasets_params = {
     },
     "mushrooms": {
         "train_path": f"{datasets_path}/mushrooms",
+        "test_path": f"{datasets_path}/mushrooms",
         "n_features": 112,
     },
     "leu": {
@@ -212,8 +213,27 @@ datasets_params = {
     "aloi.scale": {
         "train_path": f"{datasets_path}/aloi.scale",
         "n_features": 128,
-    }
+    },
     
+    
+    
+    "abalone_scale": {
+        "train_path": f"{datasets_path}/abalone_scale",
+        "test_path": f"{datasets_path}/abalone_scale",
+        "n_features": 8,
+    },
+    "bodyfat_scale": {
+        "train_path": f"{datasets_path}/bodyfat_scale",
+        "test_path": f"{datasets_path}/bodyfat_scale",
+        "n_features": 14,
+    },
+    
+    "housing_scale": {
+        "train_path": f"{datasets_path}/housing_scale",
+        "test_path": f"{datasets_path}/housing_scale",
+        "n_features": 13,
+    },
+
 }
 
 
