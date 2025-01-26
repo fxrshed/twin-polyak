@@ -21,6 +21,33 @@ class SGD(BaseOptimizer):
             
         return loss, grad
     
+    
+class SPS(BaseOptimizer):
+    
+    def __init__(self, params: np.ndarray, 
+                 c: float = 0.5, 
+                 eps: float = 1e-8,
+                 eta_max: float = np.inf):
+        
+        self.params = params
+        self.lr = 1.0
+        self.eps = eps
+        self.c = c
+        self.eta_max = eta_max
+        
+        self.defaults = dict(
+            lr=1.0,
+            c=c,
+            eps=eps,
+            )
+        
+    def step(self, loss, grad):
+        
+        self.lr = loss / ( self.c * np.linalg.norm(grad)**2 + self.eps )
+        self.lr = np.minimum(self.eta_max, self.lr)
+        self.params -= self.lr * grad
+            
+        return loss, grad
 
 class Adagrad(BaseOptimizer):
     

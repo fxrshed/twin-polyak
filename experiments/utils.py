@@ -18,13 +18,13 @@ import svmlight_loader
 from dotenv import load_dotenv
 load_dotenv()
 
-def save_results(results, model_name, dataset_name, scale, batch_size,
+def save_results(results, loss, setting, dataset_name, batch_size,
                  n_epochs, optimizer, lr, seed):
 
     results_path = os.getenv("RESULTS_DIR")
-
-    directory = f"{results_path}/{model_name}/{dataset_name}/scale_{scale}/bs_{batch_size}" \
-        f"/epochs_{n_epochs}/{optimizer}/lr_{lr}/seed_{seed}"
+        
+    directory = f"{results_path}/{loss}/{setting}/{dataset_name}/bs_{batch_size}/epochs_{n_epochs}" \
+        f"/{optimizer}/lr_{lr}/seed_{seed}"
     
     if not os.path.exists(directory):
         os.makedirs(directory)
@@ -34,20 +34,18 @@ def save_results(results, model_name, dataset_name, scale, batch_size,
 
     print(f"Results saved to {directory}")
 
-def load_results(dataset_name: str, model_name: str, scale: int, batch_size: int, n_epochs: int, optimizer: str, lr: float, seed: int) -> dict:
+def load_results(loss, setting, dataset_name, batch_size,
+                 n_epochs, optimizer, lr, seed) -> dict:
     
     results_path = os.getenv("RESULTS_DIR")
-    directory = f"{results_path}/{model_name}/{dataset_name}/scale_{scale}/bs_{batch_size}" \
-        f"/epochs_{n_epochs}/{optimizer}/lr_{lr}/seed_{seed}"
+    directory = f"{results_path}/{loss}/{setting}/{dataset_name}/bs_{batch_size}/epochs_{n_epochs}" \
+        f"/{optimizer}/lr_{lr}/seed_{seed}"
     
     assert os.path.exists(directory), f"Results {directory} do not exist."
 
-    # results = torch.load(f"{directory}/summary.p", map_location=torch.device('cpu'))
-    
     with open(f"{directory}/summary.p", "rb") as f:
         results = pickle.load(f)
 
-        
     return results 
 
 def make_synthetic_binary_classification(
