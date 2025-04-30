@@ -10,23 +10,7 @@ import sklearn
 from loss_functions import LogisticRegressionLoss
 import utils
 
-def main(dataset_name: str, 
-         test_split: float,
-         normalize: bool,
-         verbose: bool):
-    
-    np.random.seed(0)
-
-    train_data, train_target, test_data, test_target = utils.get_libsvm(name=dataset_name, test_split=test_split)
-
-    if normalize:
-        normalizer = sklearn.preprocessing.Normalizer()
-        train_data = normalizer.fit_transform(train_data)
-        test_data = normalizer.transform(test_data)
-
-    train_target = utils.map_classes_to(train_target, [-1.0, 1.0])
-    test_target = utils.map_classes_to(test_target, [-1.0, 1.0])
-
+def solve_binary_libsvm(train_data, train_target, test_data, test_target):
     w = np.random.randn(train_data.shape[1])
 
     oracle = LogisticRegressionLoss()
@@ -48,12 +32,32 @@ def main(dataset_name: str,
     )
     
     entry = {
-        "dataset_name": dataset_name,
         "train/f_star": oracle.func(train_result.x, train_data, train_target),
         "test/f_star": oracle.func(test_result.x, test_data, test_target),
         "train/x_star": train_result.x,
         "test/x_star": test_result.x
     }
+    
+    return entry
+
+def main(dataset_name: str, 
+         test_split: float,
+         normalize: bool,
+         verbose: bool):
+    
+    np.random.seed(0)
+
+    train_data, train_target, test_data, test_target = utils.get_libsvm(name=dataset_name, test_split=test_split)
+
+    if normalize:
+        normalizer = sklearn.preprocessing.Normalizer()
+        train_data = normalizer.fit_transform(train_data)
+        test_data = normalizer.transform(test_data)
+
+    train_target = utils.map_classes_to(train_target, [-1.0, 1.0])
+    test_target = utils.map_classes_to(test_target, [-1.0, 1.0])
+
+    entry = solve_binary_libsvm(train_data, train_target, test_data, test_target)
     
     if verbose:
         print(f"Train f_stat: {entry["train/f_star"]}")
@@ -69,6 +73,8 @@ def main(dataset_name: str,
         pickle.dump(entry, file, protocol=pickle.HIGHEST_PROTOCOL)    
     
     print(f"Saved to {filename}")
+    
+    return entry
     
 if __name__ == "__main__":
 

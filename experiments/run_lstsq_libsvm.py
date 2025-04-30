@@ -6,6 +6,7 @@ import argparse
 
 import numpy as np
 import scipy
+import sklearn
 
 import utils
 from loss_functions import LeastSquaresLoss
@@ -27,11 +28,13 @@ def train_loop(dataset: list[np.ndarray],
                seed: int = 0,
                **optimizer_kwargs) -> dict: 
 
-    np.random.seed(seed)
-
     train_data, train_target, test_data, test_target = dataset
     
     # parameters
+    if batch_size == train_data.shape[0]:
+        np.random.seed(seed)
+    else:
+        np.random.seed(0)
     params = np.random.randn(train_data.shape[1])
     optim = optimizer(params, **optimizer_kwargs)
 
@@ -40,8 +43,6 @@ def train_loop(dataset: list[np.ndarray],
     
     # logging 
     history = defaultdict(list)
-
-    indices = np.arange(train_data.shape[0])
     
     # Train Evaluation 
     loss = loss_function.func(params, train_data, train_target)
@@ -59,6 +60,9 @@ def train_loop(dataset: list[np.ndarray],
     history["test/loss"].append(loss)
     history["test/grad_norm_sq"].append(g_norm_sq)
     
+    np.random.seed(seed)
+    indices = np.arange(train_data.shape[0])
+    
     for epoch in range(n_epochs):
                 
         # Training 
@@ -73,7 +77,13 @@ def train_loop(dataset: list[np.ndarray],
             train_loss = loss_function.func(params, batch_data, batch_target)
             train_grad = loss_function.grad(params, batch_data, batch_target)
 
-            optim.step(loss=train_loss, grad=train_grad)
+            if optim.__class__.__name__ == "SLS":
+                def closure(params):
+                    return loss_function.func(params, batch_data, batch_target)
+                optim.step(loss=train_loss, grad=train_grad, closure=closure)
+            else:
+                optim.step(loss=train_loss, grad=train_grad)
+                
             history["lr"].append(optim.lr)
 
         # Train Evaluation 
@@ -102,11 +112,13 @@ def twin_polyak(dataset: list[np.ndarray],
                seed: int = 0,
                ) -> dict: 
     
-    np.random.seed(seed)
-
     train_data, train_target, test_data, test_target = dataset
 
     # parameters
+    if batch_size == train_data.shape[0]:
+        np.random.seed(seed)
+    else:
+        np.random.seed(0)
     params_x = np.random.randn(train_data.shape[1])
     params_y = np.random.randn(train_data.shape[1])
 
@@ -116,8 +128,6 @@ def twin_polyak(dataset: list[np.ndarray],
     # logging 
     history = defaultdict(list)
 
-    indices = np.arange(train_data.shape[0])
-    
     # Train Evaluation 
     loss, grad = loss_function.func(params_x, train_data, train_target), loss_function.grad(params_x, train_data, train_target)
     g_norm_sq = np.linalg.norm(grad)**2
@@ -129,7 +139,10 @@ def twin_polyak(dataset: list[np.ndarray],
     g_norm_sq = np.linalg.norm(grad)**2
     history["test/loss"].append(loss)
     history["test/grad_norm_sq"].append(g_norm_sq)
-    
+
+    np.random.seed(seed)
+    indices = np.arange(train_data.shape[0])
+
     for epoch in range(n_epochs):
     
         # Training 
@@ -191,12 +204,15 @@ def twin_polyak(dataset: list[np.ndarray],
 
 def main(seed: int, dataset_name: str, test_split: float, 
          batch_size: int, n_epochs: int, optimizer_name: str, 
-         lr: float, eta_max: float, eps: float, save: bool):
+         lr: float, eta_max: float, c_0: float, eps: float, save: bool):
     
     train_data, train_target, test_data, test_target = utils.get_libsvm(name=dataset_name, test_split=test_split)
 
     if test_split == 0.0:
         test_data, test_target = train_data, train_target
+        
+    train_data, train_target = sklearn.preprocessing.normalize(train_data, norm='l2', axis=1), train_target
+    test_data, test_target = sklearn.preprocessing.normalize(test_data, norm='l2', axis=1), test_target
 
     dataset = train_data, train_target, test_data, test_target
     
@@ -250,12 +266,37 @@ def main(seed: int, dataset_name: str, test_split: float,
                        eps=eps,
                        seed=seed,
                        )
+            
+        elif optimizer_name == "DecSPS":
+            hist = train_loop(
+                dataset=dataset,
+                batch_size=bs,
+                n_epochs=n_epochs, 
+                optimizer=DecSPS,
+                seed=seed,
+                eps=eps,
+                c_0=c_0,
+                eta_max=eta_max,
+            )
+            
+        elif optimizer_name == "SLS":
+            hist = train_loop(
+                dataset=dataset,
+                batch_size=bs,
+                n_epochs=n_epochs,
+                optimizer=SLS,
+                seed=seed
+            )
 
         if save:
             results = {"args": vars(args), **hist}
             
             if optimizer_name == "SPSMAX":
-                optimizer_name += f"_{eta_max}".replace(".", "_")
+                optimizer_name_formatted = f"{optimizer_name}_{eta_max}".replace(".", "_")
+            elif optimizer_name == "DecSPS":
+                optimizer_name_formatted = f"{optimizer_name}_{eta_max}_{c_0}".replace(".", "_")
+            else:
+                optimizer_name_formatted = optimizer_name
                 
             utils.save_results(results=results, 
                                loss="lstsq", 
@@ -263,7 +304,7 @@ def main(seed: int, dataset_name: str, test_split: float,
                                dataset_name=dataset_name, 
                                batch_size=batch_size, # not `bs` here because of deterministic case
                                n_epochs=n_epochs, 
-                               optimizer=optimizer_name, 
+                               optimizer=optimizer_name_formatted, 
                                lr=f"{lr}".replace(".", "_"), 
                                seed=seed)
 
@@ -273,11 +314,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Help me!")
     parser.add_argument("--dataset", type=str, help="Name of a dataset from LibSVM datasets directory.")
     parser.add_argument("--test_split", type=float, default=0.0, help="train-test split ratio.")
-    parser.add_argument("--batch_size", type=int, default=0)
-    parser.add_argument("--n_epochs", type=int)
-    parser.add_argument("--optimizer", type=str, choices=["STP", "SPSMAX", "SGD", "SGD-L"])
+    parser.add_argument("--batch-size", type=int, default=0)
+    parser.add_argument("--n-epochs", type=int)
+    parser.add_argument("--optimizer", type=str, choices=["STP", "SPSMAX", "SGD", "SGD-L", "DecSPS", "SLS"])
     parser.add_argument("--lr", type=float, default=1.0)
-    parser.add_argument("--eta_max", type=float, default=1.0)
+    parser.add_argument("--eta-max", type=float, default=1.0)
+    parser.add_argument("--c0", type=float, default=1.0)
     parser.add_argument("--eps", type=float, default=0.0)
     parser.add_argument("--save", action=argparse.BooleanOptionalAction, default=False, help="Select to save the results of the run.")
     parser.add_argument("--seed", type=int, default=0, help="Random seed, i.e. --seed=3 will run with seed(3). Enter -1 to train on 5 seeds.")
@@ -293,6 +335,7 @@ if __name__ == "__main__":
         optimizer_name=args.optimizer, 
         lr=args.lr, 
         eta_max=args.eta_max,
+        c_0=args.c0,
         eps=args.eps, 
         save=args.save,
         )

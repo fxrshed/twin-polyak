@@ -42,11 +42,57 @@ def load_results(loss, setting, dataset_name, batch_size,
         f"/{optimizer}/lr_{lr}/seed_{seed}"
     
     assert os.path.exists(directory), f"Results {directory} do not exist."
-
+    
     with open(f"{directory}/summary.p", "rb") as f:
         results = pickle.load(f)
-
+        
     return results 
+
+
+def moving_average(interval, window_size):
+    """
+    Computes a moving average with better edge handling.
+    
+    Args:
+        interval (np.ndarray): Input data sequence (1D array).
+        window_size (int): Size of the moving average window.
+
+    Returns:
+        np.ndarray: Smoothed sequence with the same length as input.
+    """
+    if window_size == 0:
+        return interval
+    
+    if window_size < 1:
+        raise ValueError("Window size must be at least 1.")
+
+    # Reflective padding to avoid edge artifacts
+    pad_size = window_size // 2
+    padded_interval = np.pad(interval, pad_size, mode='reflect')
+
+    # Create a normalized smoothing window
+    window = np.ones(window_size) / window_size
+
+    # Apply convolution
+    averaged = np.convolve(padded_interval, window, mode='valid')
+    
+    # Ensure to keep the first entry out of averaging 
+    # In this case it is done so that in plots metrics (loss, norm of gradient, etc.) do not appear to have different starting point 
+    averaged[0] = interval[0] 
+    
+    return averaged
+
+
+def generate_scaling_vec(size: int = 0, scale: int = 1, seed: int = 0):
+    
+    np.random.seed(seed)
+    
+    r1 = -scale
+    r2 = scale
+    scaling_vec = (r1 - r2) * np.random.uniform(size=size) + r2
+    scaling_vec = np.power(np.e, scaling_vec)
+
+    return scaling_vec
 
 def make_synthetic_binary_classification(
     n_samples: int, 
@@ -214,24 +260,45 @@ datasets_params = {
     },
     
     
-    
+    "abalone": {
+        "train_path": f"{datasets_path}/abalone",
+        "test_path": f"{datasets_path}/abalone",
+        "n_features": 8,
+    },
     "abalone_scale": {
         "train_path": f"{datasets_path}/abalone_scale",
         "test_path": f"{datasets_path}/abalone_scale",
         "n_features": 8,
     },
+    
     "bodyfat_scale": {
         "train_path": f"{datasets_path}/bodyfat_scale",
         "test_path": f"{datasets_path}/bodyfat_scale",
         "n_features": 14,
     },
     
+    "housing": {
+        "train_path": f"{datasets_path}/housing",
+        "test_path": f"{datasets_path}/housing",
+        "n_features": 13,
+    },
     "housing_scale": {
         "train_path": f"{datasets_path}/housing_scale",
         "test_path": f"{datasets_path}/housing_scale",
         "n_features": 13,
     },
-
+    
+    "cpusmall": {
+        "train_path": f"{datasets_path}/cpusmall",
+        "test_path": f"{datasets_path}/cpusmall",
+        "n_features": 12,
+    },
+    "cpusmall_scale": {
+        "train_path": f"{datasets_path}/cpusmall_scale",
+        "test_path": f"{datasets_path}/cpusmall_scale",
+        "n_features": 12,
+    }
+    
 }
 
 
@@ -251,6 +318,9 @@ def get_libsvm(name: str, test_split: float = 0.0, seed: int = 0):
     elif test_split > 0.0:
         print(f"Test data for `{name}` is not found. Splitting train into {(1 - test_split) * 100}% train and {test_split * 100}% test.")
         train_data, test_data, train_target, test_target = train_test_split(train_data, train_target, test_size=test_split, random_state=seed)
+    elif test_split == 0.0:
+        print(f"Warning: Using `train data` as `test data`. Metrics for `test data` in results will be for `test data`.")
+        test_data, test_target = train_data, train_target
         
     return train_data, train_target, test_data, test_target
 
