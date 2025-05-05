@@ -161,7 +161,7 @@ def train_optimizer(
             history["test/accuracy/top5"].append(accuracy[2])
             
             run["test/loss"].append(loss)
-            run["test/accuracu/top1"].append(accuracy[0])
+            run["test/accuracy/top1"].append(accuracy[0])
             run["test/accuracy/top3"].append(accuracy[1])
             run["test/accuracy/top5"].append(accuracy[2])
             
