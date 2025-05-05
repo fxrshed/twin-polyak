@@ -18,6 +18,7 @@ import svmlight_loader
 from dotenv import load_dotenv
 load_dotenv()
 
+
 def save_results(results, loss, setting, dataset_name, batch_size,
                  n_epochs, optimizer, lr, seed):
 
@@ -47,6 +48,40 @@ def load_results(loss, setting, dataset_name, batch_size,
         results = pickle.load(f)
         
     return results 
+
+
+def save_results_dnn(results, model_name, dataset_name, batch_size,
+                 n_epochs, optimizer, lr, seed):
+
+    results_path = os.getenv("RESULTS_DIR")
+        
+    directory = f"{results_path}/{model_name}/{dataset_name}/bs_{batch_size}/epochs_{n_epochs}" \
+        f"/{optimizer}/lr_{lr}/seed_{seed}"
+    
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+    
+    with open(f"{directory}/summary.p", "wb") as f:
+        pickle.dump(results, f)
+
+    print(f"Results saved to {directory}")
+    
+
+
+def load_results_dnn(model_name, dataset_name, batch_size,
+                 n_epochs, optimizer, lr, seed) -> dict:
+    
+    results_path = os.getenv("RESULTS_DIR")
+    directory = f"{results_path}/{model_name}/{dataset_name}/bs_{batch_size}/epochs_{n_epochs}" \
+        f"/{optimizer}/lr_{lr}/seed_{seed}"
+    
+    assert os.path.exists(directory), f"Results {directory} do not exist."
+    
+    with open(f"{directory}/summary.p", "rb") as f:
+        results = pickle.load(f)
+        
+    return results 
+
 
 
 def moving_average(interval, window_size):
