@@ -1,10 +1,10 @@
 import os
+import sys
 import argparse
 import re
 import pickle
 import datetime
 
-import torch
 import torchvision
 from torchvision.transforms import v2
 from torch.utils.data import TensorDataset, DataLoader
@@ -13,10 +13,24 @@ from sklearn.model_selection import train_test_split
 
 import numpy as np
 
+import sps 
+import sls
+from pt_methods import *
+
+
 import svmlight_loader
 
 from dotenv import load_dotenv
 load_dotenv()
+
+
+optimizers_dict = {
+    "SGD": torch.optim.SGD,
+    "SPSMAX": sps.Sps,
+    "SLS": sls.Sls,
+    "DecSPS": DecSPS,
+}
+
 
 
 def save_results(results, loss, setting, dataset_name, batch_size,
@@ -81,6 +95,62 @@ def load_results_dnn(model_name, dataset_name, batch_size,
         results = pickle.load(f)
         
     return results 
+
+
+def compute_topk_accuracy(output, target, k=5):
+    """Compute top-k accuracy for the given outputs and targets."""
+    with torch.no_grad():
+        # Get the top-k indices
+        _, topk_indices = output.topk(k, dim=1)
+        # Check if targets are in the top-k predictions
+        correct = topk_indices.eq(target.view(-1, 1).expand_as(topk_indices))
+        # Compute accuracy
+        return correct.any(dim=1).float().mean().item()
+
+
+def eval_model(
+    model: torch.nn.Module, 
+    criterion: torch.nn.Module, 
+    dataloader: DataLoader) -> tuple[float, tuple[float, float, float]]: 
+    """Model loss and accuracy evaluation procedure for multi-class classification tasks.
+
+    Args:
+        model (torch.nn.Module): _description_
+        criterion (torch.nn.Module): _description_
+        dataloader (DataLoader): _description_
+
+    Returns:
+        _type_: _description_
+    """
+    test_epoch_loss = 0.0
+    total = 0
+    correct = 0
+    top3_acc = 0.0
+    top5_acc = 0.0
+    device = next(model.parameters()).device
+    for i, (batch_data, batch_target) in enumerate(dataloader):
+        batch_data = batch_data.to(device)
+        batch_target = batch_target.to(device)
+        
+        outputs = model(batch_data)
+        loss = criterion(outputs, batch_target)
+        test_epoch_loss += loss.item() * batch_data.size(0)
+        
+        _, predicted = torch.max(outputs.data, 1)
+        total += batch_target.size(0)
+        batch_correct = (predicted == batch_target).sum().item()
+        batch_accuracy = batch_correct / batch_target.size(0)
+        correct += batch_correct
+        
+        top3_acc += compute_topk_accuracy(outputs, batch_target, k=3) * batch_target.size(0)
+        top5_acc += compute_topk_accuracy(outputs, batch_target, k=5) * batch_target.size(0)
+        
+    loss = test_epoch_loss / len(dataloader.sampler)
+    top1_accuracy = correct / total
+    top3_accuracy = top3_acc / total
+    top5_accuracy = top5_acc / total
+
+    return loss, (top1_accuracy, top3_accuracy, top5_accuracy)
 
 
 

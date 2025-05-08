@@ -38,24 +38,39 @@ def main(
 ) -> None:
     
     ## DATASET
-    DATASET_NAME = "MNIST"
+    DATASET_NAME = "SVHN"
     TORCHVISION_DATASETS_DIR = os.getenv("TORCHVISION_DATASETS_DIR")
 
-    transforms = v2.Compose([
-            v2.RandomRotation(10),
-            v2.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2),
-            v2.ToImage(),
-            v2.ToDtype(torch.float32, scale=True),
-            v2.Normalize(
-                (0.1307,), (0.3081,),
-            ),
-        ])
+    train_transforms = v2.Compose([
+        v2.RandomResizedCrop(size=(32, 32), antialias=True),
+        v2.RandomAffine(0, shear=10, scale=(0.8,1.2)),
+        v2.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2),
+        v2.ToImage(),
+        v2.ToDtype(torch.get_default_dtype(), scale=True),
+        v2.Normalize(
+            (0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761),
+        ),
+    ])
 
-    train_data = torchvision.datasets.MNIST(TORCHVISION_DATASETS_DIR, train=True, download=True, transform=transforms)
-    test_data = torchvision.datasets.MNIST(TORCHVISION_DATASETS_DIR, train=False, download=True, transform=transforms)
+    test_transforms = v2.Compose([
+        v2.Resize(size=(32, 32)),
+        v2.CenterCrop((32, 32)),
+        v2.ToImage(),
+        v2.ToDtype(torch.get_default_dtype(), scale=True),
+        v2.Normalize(
+            (0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761),
+        ),
+    ])
 
-    train_dataloader = DataLoader(train_data, batch_size=train_batch_size, shuffle=True)
-    test_dataloader = DataLoader(test_data, batch_size=test_batch_size, shuffle=False)
+    train_data = torchvision.datasets.SVHN(
+        TORCHVISION_DATASETS_DIR, split="train", download=True, transform=train_transforms
+        )
+    test_data = torchvision.datasets.SVHN(
+        TORCHVISION_DATASETS_DIR, split="test", download=True, transform=test_transforms
+        )
+
+    train_dataloader = DataLoader(train_data, batch_size=train_batch_size, shuffle=True, num_workers=2)
+    test_dataloader = DataLoader(test_data, batch_size=test_batch_size, shuffle=False, num_workers=2)
     
     dataset = (train_dataloader, test_dataloader)
     ###
@@ -174,7 +189,7 @@ def main(
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Help me!")
-    parser.add_argument("--model", type=str, choices=["LeNet5"])
+    parser.add_argument("--model", type=str, default="ShuffleNetV2x0_5", choices=["LeNet5", "WideResNet16-8", "ShuffleNetV2x0_5"])
     parser.add_argument("--optimizer", type=str, choices=["SGD", "SPSMAX", "SLS", "DecSPS", "STP"])
     parser.add_argument("--lr", type=float, default=1.0)
     parser.add_argument("--eta-max", type=float, default=1.0)
