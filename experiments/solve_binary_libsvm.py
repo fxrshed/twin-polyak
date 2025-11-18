@@ -7,7 +7,8 @@ import pandas as pd
 import scipy
 import sklearn
 
-from loss_functions import LogisticRegressionLoss
+from npkit.loss import LogisticRegressionLoss
+
 import utils
 
 def solve_binary_libsvm(train_data, train_target, test_data, test_target):
@@ -16,7 +17,7 @@ def solve_binary_libsvm(train_data, train_target, test_data, test_target):
     oracle = LogisticRegressionLoss()
 
     train_result = scipy.optimize.minimize(
-        fun=oracle.func,
+        fun=oracle.loss,
         jac=oracle.grad,
         x0=w,
         args=(train_data, train_target),
@@ -24,7 +25,7 @@ def solve_binary_libsvm(train_data, train_target, test_data, test_target):
     )
 
     test_result = scipy.optimize.minimize(
-        fun=oracle.func,
+        fun=oracle.loss,
         jac=oracle.grad,
         x0=w,
         args=(test_data, test_target),

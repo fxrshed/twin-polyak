@@ -12,7 +12,7 @@ import utils
 
 import sls
 import sps
-from pt_methods import DecSPS
+from pt_methods import DecSPS, Momo
 
 def train_optimizer(
     model_name: str,
@@ -39,8 +39,6 @@ def train_optimizer(
     model = models_dict[model_name](num_classes=num_classes).to(device)
     
     optimizer = utils.optimizers_dict[optimizer_name](model.parameters(), **optimizer_kwargs)
-    if optimizer_name in ["SGD"]:
-        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=n_epochs)
     criterion = nn.CrossEntropyLoss()
     
     history = defaultdict(list)
@@ -97,14 +95,16 @@ def train_optimizer(
                 history["lr"].append(optimizer.step_size)
                 neptune_run["lr"].append(optimizer.step_size)
                 train_loss += loss.item() * batch_data.size(0)
+            elif isinstance(optimizer, Momo):
+                loss = optimizer.step(closure=closure)
+                history["lr"].append(optimizer.state["step_size_list"][-1])
+                neptune_run["lr"].append(optimizer.state["step_size_list"][-1])
+                train_loss += loss.item() * batch_data.size(0)
             else:
                 loss = optimizer.step(closure=closure)
                 history["lr"].append(optimizer.param_groups[0]["lr"])
                 neptune_run["lr"].append(optimizer.param_groups[0]["lr"])
                 train_loss += loss.item() * batch_data.size(0)
-        
-        if optimizer_name in ["SGD"]:
-            scheduler.step()
         
         history["train/loss"].append(train_loss / len(train_dataloader.sampler))
         neptune_run["train/loss"].append(train_loss / len(train_dataloader.sampler))

@@ -12,7 +12,7 @@ import torchvision
 from torchvision.transforms import v2
 
 import utils
-from pt_twin_polyak import train_twin_polyak
+from pt_twin_polyak import train_twin_polyak, train_twin_polyak_ma
 from pt_run_optimizer import train_optimizer
 
 from dotenv import load_dotenv
@@ -27,6 +27,7 @@ def main(
     model_name: str,
     optimizer_name: str,
     lr: float,
+    beta: float,
     n_epochs: int,
     train_batch_size: int,
     test_batch_size: int,
@@ -45,7 +46,7 @@ def main(
         v2.RandomResizedCrop(size=(32, 32), antialias=True),
         v2.RandomHorizontalFlip(p=0.5),
         v2.RandomRotation(10),
-        v2.RandomAffine(0, shear=10, scale=(0.8,1.2)),
+        v2.RandomAffine(0, shear=10, scale=(0.8, 1.2)),
         v2.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2),
         v2.ToImage(),
         v2.ToDtype(torch.get_default_dtype(), scale=True),
@@ -110,8 +111,9 @@ def main(
                 neptune_run=neptune_run,
                 device=device,
                 lr=lr,
+                momentum=beta,
             )
-        elif optimizer_name == "SPSMAX":
+        elif optimizer_name == "SPS":
             history = train_optimizer(
                 model_name=model_name,
                 optimizer_name=optimizer_name,
@@ -144,7 +146,19 @@ def main(
                 eta_max=eta_max,
                 c_0=c_0,
             )
-        elif optimizer_name in ["STP"]:
+        elif optimizer_name == "Momo":
+            history = train_optimizer(
+                model_name=model_name,
+                optimizer_name=optimizer_name,
+                dataset=dataset,
+                n_epochs=n_epochs,
+                seed=seed,
+                neptune_run=neptune_run,
+                device=device,
+                lr=lr, 
+                beta=beta,
+            )
+        elif optimizer_name  == "STP":
             history = train_twin_polyak(
                 model_name=model_name,
                 dataset=dataset,
@@ -154,24 +168,35 @@ def main(
                 device=device,
             )
         
+        elif optimizer_name == "STPm":
+            history = train_twin_polyak_ma(
+                model_name=model_name,
+                dataset=dataset,
+                n_epochs=n_epochs,
+                seed=seed,
+                neptune_run=neptune_run,
+                device=device,
+                beta=beta,
+            )
+        
+        
         neptune_run.stop() 
         
         if save:
             results = {"args": vars(args), **history}
-
-            ## REMOVE ONCE METHODS WITH MOMENTUM ARE INCLUDED
-            beta = 0.0
             
-            if optimizer_name == "SPSMAX":
+            if optimizer_name == "SPS":
                 optimizer_name_formatted = f"{optimizer_name}_{eta_max}".replace(".", "_")
             elif optimizer_name == "DecSPS":
                 optimizer_name_formatted = f"{optimizer_name}_{eta_max}_{c_0}".replace(".", "_")
-            elif optimizer_name == "STP-MA":
+            elif optimizer_name == "STPm":
                 optimizer_name_formatted = f"{optimizer_name}_{beta}".replace(".", "_")
-            elif optimizer_name == "SPS-MA":
+            elif optimizer_name == "SPSMA":
                 optimizer_name_formatted = f"{optimizer_name}_{eta_max}_{beta}".replace(".", "_")
-            elif optimizer_name == "SGD-MoMo":
-                optimizer_name_formatted = f"{optimizer_name}_{beta}".replace(".", "_")
+            elif optimizer_name == "Momo":
+                optimizer_name_formatted = f"{optimizer_name}_{lr}_{beta}".replace(".", "_")
+            elif optimizer_name == "SGD":
+                optimizer_name_formatted = f"{optimizer_name}_{lr}_{beta}".replace(".", "_")
             else:
                 optimizer_name_formatted = optimizer_name
                 
@@ -191,9 +216,10 @@ def main(
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Help me!")
-    parser.add_argument("--model", type=str, choices=["LeNet5", "WideResNet16-8"])
-    parser.add_argument("--optimizer", type=str, choices=["SGD", "SPSMAX", "SLS", "DecSPS", "STP"])
+    parser.add_argument("--model", type=str, default="WideResNet16-8", choices=["LeNet5", "WideResNet16-8"])
+    parser.add_argument("--optimizer", type=str, choices=list(utils.optimizers_dict.keys()))
     parser.add_argument("--lr", type=float, default=1.0)
+    parser.add_argument("--beta", type=float, default=0.0)
     parser.add_argument("--eta-max", type=float, default=1.0)
     parser.add_argument("--c_0", type=float, default=1.0)
     parser.add_argument("--train_batch_size", type=int, default=512)
@@ -211,6 +237,7 @@ if __name__ == "__main__":
     main(model_name=args.model, 
          optimizer_name=args.optimizer, 
          lr=args.lr, 
+         beta=args.beta,
          eta_max=args.eta_max,
          c_0=args.c_0,
          n_epochs=args.n_epochs, 
@@ -221,7 +248,7 @@ if __name__ == "__main__":
          neptune_mode=args.neptune_mode)
         
     c = round(time.time() - start_time, 2)
-    print(f"Run complete in {str(datetime.timedelta(seconds=c))} hrs:min:sec.")
+    print(f"Run finished in {str(datetime.timedelta(seconds=c))} hrs:min:sec.")
 
 
 

@@ -11,7 +11,7 @@ import sklearn.model_selection
 
 import utils
 from loss_functions import LogisticRegressionLoss
-from methods import *
+from np_methods import *
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -149,130 +149,159 @@ def main(seed: int, dataset_name: str, test_split: float,
         setting = "stochastic"
     
     if seed == -1:
+        print("[INFO]: Multiple seeds.")
         seeds = [0, 1, 2, 3, 4]
     else:
         seeds = [seed]
+        
+    if lr == -1.0:
+        print("[INFO]: Multiple learning rates.")
+        lrs = [2**x for x in range(-20, 20)]
+    else:
+        lrs = [lr]
+        
     
-    for seed in seeds:
-        if optimizer_name == "SGD-L":
-            L = (0.25 / train_data.shape[0]) * scipy.sparse.linalg.norm(train_data.T @ train_data, ord=2)
-            hist = train_loop(
-                dataset=dataset,
-                batch_size=bs,
-                n_epochs=n_epochs,
-                optimizer=SGD,
-                seed=seed,
-                lr=1/L,
-            )
-        elif optimizer_name == "SGD":
-            hist = train_loop(
-                dataset=dataset,
-                batch_size=bs,
-                n_epochs=n_epochs,
-                optimizer=SGD,
-                seed=seed,
-                lr=lr,
-            )
-        elif optimizer_name == "SPSMAX":
-            hist = train_loop(
-                dataset=dataset,
-                batch_size=bs,
-                n_epochs=n_epochs,
-                optimizer=SPS,
-                seed=seed,
-                eta_max=eta_max,
-                eps=eps,
-            )
-            
-        elif optimizer_name == "STP":
-            hist = twin_polyak(dataset=dataset,
-                       batch_size=bs,
-                       n_epochs=n_epochs,
-                       eps=eps,
-                       seed=seed,
-                       )
-            
-        elif optimizer_name == "DecSPS":
-            hist = train_loop(
-                dataset=dataset,
-                batch_size=bs,
-                n_epochs=n_epochs, 
-                optimizer=DecSPS,
-                seed=seed,
-                eps=eps,
-                c_0=c_0,
-                eta_max=eta_max,
-            )
-            
-        elif optimizer_name == "SLS":
-            hist = train_loop(
-                dataset=dataset,
-                batch_size=bs,
-                n_epochs=n_epochs,
-                optimizer=SLS,
-                seed=seed
-            )
-        elif optimizer_name == "STP-MA":
-            hist = twin_polyak_ma(
-                dataset=dataset,
-                batch_size=bs,
-                n_epochs=n_epochs,
-                seed=seed,
-                beta=beta,
-                eps=eps
-            )
-        elif optimizer_name == "SPS-MA":
-            hist = train_loop(
-                dataset=dataset,
-                batch_size=bs,
-                n_epochs=n_epochs,
-                optimizer=SPS_MA,
-                seed=seed,
-                betas=(beta, beta),
-                eta_max=eta_max,
-            )
-        elif optimizer_name == "SGD-MoMo":
-            hist = train_loop(
-                dataset=dataset,
-                batch_size=batch_size,
-                n_epochs=n_epochs,
-                optimizer=SGD_Momo,
-                seed=seed,
-                beta=beta,
-                lr=lr,
-                eps=eps
+    for lr in lrs:
+        
+        for seed in seeds:
+            if optimizer_name == "SGD-L":
+                L = (0.25 / train_data.shape[0]) * scipy.sparse.linalg.norm(train_data.T @ train_data, ord=2)
+                hist = train_loop(
+                    dataset=dataset,
+                    batch_size=bs,
+                    n_epochs=n_epochs,
+                    optimizer=SGD,
+                    seed=seed,
+                    lr=1/L,
                 )
-
-        if save:
-            results = {"args": vars(args), **hist}
-            
-            if optimizer_name == "SPSMAX":
-                optimizer_name_formatted = f"{optimizer_name}_{eta_max}".replace(".", "_")
-            elif optimizer_name == "DecSPS":
-                optimizer_name_formatted = f"{optimizer_name}_{eta_max}_{c_0}".replace(".", "_")
-            elif optimizer_name == "STP-MA":
-                optimizer_name_formatted = f"{optimizer_name}_{beta}".replace(".", "_")
-            elif optimizer_name == "SPS-MA":
-                optimizer_name_formatted = f"{optimizer_name}_{eta_max}_{beta}".replace(".", "_")
-            elif optimizer_name == "SGD-MoMo":
-                optimizer_name_formatted = f"{optimizer_name}_{beta}".replace(".", "_")
-            else:
-                optimizer_name_formatted = optimizer_name
+            elif optimizer_name == "SGD":
+                hist = train_loop(
+                    dataset=dataset,
+                    batch_size=bs,
+                    n_epochs=n_epochs,
+                    optimizer=SGD,
+                    seed=seed,
+                    lr=lr,
+                )
+            elif optimizer_name == "SPSMAX":
+                hist = train_loop(
+                    dataset=dataset,
+                    batch_size=bs,
+                    n_epochs=n_epochs,
+                    optimizer=SPS,
+                    seed=seed,
+                    eta_max=eta_max,
+                )
                 
-            utils.save_results(results=results, 
-                               loss="logreg", 
-                               setting=setting, 
-                               dataset_name=dataset_name, 
-                               batch_size=batch_size, # not `bs` here because of deterministic case
-                               n_epochs=n_epochs, 
-                               optimizer=optimizer_name_formatted, 
-                               lr=f"{lr}".replace(".", "_"), 
-                               seed=seed)
+            elif optimizer_name == "STP":
+                hist = twin_polyak(dataset=dataset,
+                        batch_size=bs,
+                        n_epochs=n_epochs,
+                        seed=seed,
+                        )
+                
+            elif optimizer_name == "DecSPS":
+                hist = train_loop(
+                    dataset=dataset,
+                    batch_size=bs,
+                    n_epochs=n_epochs, 
+                    optimizer=DecSPS,
+                    seed=seed,
+                    c_0=c_0,
+                    eta_max=eta_max,
+                )
+                
+            elif optimizer_name == "SLS":
+                hist = train_loop(
+                    dataset=dataset,
+                    batch_size=bs,
+                    n_epochs=n_epochs,
+                    optimizer=SLS,
+                    seed=seed
+                )
+            elif optimizer_name == "STP-MA":
+                hist = twin_polyak_ma(
+                    dataset=dataset,
+                    batch_size=bs,
+                    n_epochs=n_epochs,
+                    seed=seed,
+                    beta=beta,
+                )
+            elif optimizer_name == "SPS-MA":
+                print("Warning (SPS-MA): Using `lr` as `eta_max`.")
+                eta_max = lr
+                hist = train_loop(
+                    dataset=dataset,
+                    batch_size=bs,
+                    n_epochs=n_epochs,
+                    optimizer=SPS_MA,
+                    seed=seed,
+                    betas=(beta, beta),
+                    eta_max=eta_max,
+                )
+            elif optimizer_name == "SGD-MoMo":
+                hist = train_loop(
+                    dataset=dataset,
+                    batch_size=batch_size,
+                    n_epochs=n_epochs,
+                    optimizer=SGD_Momo,
+                    seed=seed,
+                    beta=beta,
+                    lr=lr,
+                    )
+            elif optimizer_name == "Adam":
+                hist = train_loop(
+                    dataset=dataset,
+                    batch_size=batch_size,
+                    n_epochs=n_epochs,
+                    optimizer=Adam,
+                    seed=seed,
+                    lr=lr,
+                    )
+            elif optimizer_name == "Adagrad":
+                hist = train_loop(
+                    dataset=dataset,
+                    batch_size=batch_size,
+                    n_epochs=n_epochs,
+                    optimizer=Adagrad,
+                    seed=seed,
+                    lr=lr,
+                    )
+
+            if save:
+                results = {"args": vars(args), **hist}
+                
+                if optimizer_name == "SPSMAX":
+                    optimizer_name_formatted = f"{optimizer_name}_{eta_max}".replace(".", "_")
+                elif optimizer_name == "DecSPS":
+                    optimizer_name_formatted = f"{optimizer_name}_{eta_max}_{c_0}".replace(".", "_")
+                elif optimizer_name == "STP-MA":
+                    optimizer_name_formatted = f"{optimizer_name}_{beta}".replace(".", "_")
+                elif optimizer_name == "SPS-MA":
+                    optimizer_name_formatted = f"{optimizer_name}_{eta_max}_{beta}".replace(".", "_")
+                elif optimizer_name == "SGD-MoMo":
+                    optimizer_name_formatted = f"{optimizer_name}_{beta}".replace(".", "_")
+                elif optimizer_name == "SGD-MA":
+                    optimizer_name_formatted = f"{optimizer_name}_{lr}_{beta}".replace(".", "_")
+                elif optimizer_name in ["Adam", "Adagrad"]:
+                    optimizer_name_formatted = f"{optimizer_name}_{lr}".replace(".", "_")
+                else:
+                    optimizer_name_formatted = optimizer_name
+                    
+                utils.save_results(results=results, 
+                                loss="logreg", 
+                                setting=setting, 
+                                dataset_name=dataset_name, 
+                                batch_size=batch_size, # not `bs` here because of deterministic case
+                                n_epochs=n_epochs, 
+                                optimizer=optimizer_name_formatted, 
+                                lr=f"{lr}".replace(".", "_"), 
+                                seed=seed)
 
 
 if __name__ == "__main__":
     
-    optimizers = ["STP", "SPSMAX", "SGD", "SGD-L", "DecSPS", "SLS", "STP-MA", "SPS-MA", "SGD-MoMo"]
+    optimizers = ["STP", "SPSMAX", "SGD", "SGD-L", "DecSPS", "SLS", "STP-MA", "SPS-MA", "SGD-MoMo", "Adam", "Adagrad"]
 
     parser = argparse.ArgumentParser(description="Help me!")
     parser.add_argument("--dataset", type=str, help="Name of a dataset from LibSVM datasets directory.")

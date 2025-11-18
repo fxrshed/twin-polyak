@@ -7,7 +7,7 @@ import datetime
 
 import torchvision
 from torchvision.transforms import v2
-from torch.utils.data import TensorDataset, DataLoader
+from torch.utils.data import TensorDataset, DataLoader, Dataset
 
 from sklearn.model_selection import train_test_split
 
@@ -26,9 +26,12 @@ load_dotenv()
 
 optimizers_dict = {
     "SGD": torch.optim.SGD,
-    "SPSMAX": sps.Sps,
+    "SPS": sps.Sps,
     "SLS": sls.Sls,
     "DecSPS": DecSPS,
+    "Momo": Momo,
+    "STPm": None,
+    "STP": None,
 }
 
 
@@ -363,8 +366,6 @@ datasets_params = {
         "train_path": f"{datasets_path}/aloi.scale",
         "n_features": 128,
     },
-    
-    
     "abalone": {
         "train_path": f"{datasets_path}/abalone",
         "test_path": f"{datasets_path}/abalone",
@@ -402,8 +403,12 @@ datasets_params = {
         "train_path": f"{datasets_path}/cpusmall_scale",
         "test_path": f"{datasets_path}/cpusmall_scale",
         "n_features": 12,
+    },
+    "yeast": {
+        "train_path": f"{datasets_path}/yeast_train.svm",
+        "test_path": f"{datasets_path}/yeast_test.svm",
+        "n_features": 103,
     }
-    
 }
 
 
@@ -602,4 +607,35 @@ def evaluate_classification_model(model: torch.nn.Module, criterion: torch.nn.Mo
 
 
 
+
+class SimpleDataset(Dataset):
+    def __init__(self, X_sparse, y_array):
+        self.X = X_sparse
+        self.y = y_array
+
+    def __len__(self):
+        return self.X.shape[0]
+
+    def __getitem__(self, idx):
+        return self.X[idx], self.y[idx]
+    
+def parse_optimizer_hparams(unknown):
+
+    opt_hparams = {}
+    for arg in unknown:
+        hparam = arg.replace(' ', '=')
+        key, value = hparam.split("=")
+        key = key.lstrip('-')
+
+        try:
+            if '.' in value or 'e' in value:
+                value = float(value)
+            else:
+                value = int(value)
+        except ValueError:
+            pass
+
+        opt_hparams[key] = value
+    
+    return opt_hparams
 
