@@ -197,10 +197,20 @@ cython_debug/
 *.pt
 *.out
 *.sh
+*.ckpt
 slurm_*
 .hostname
 *.txt
 experiments/optuna
 experiments/plots
+experiments/results
 experiments/.neptune
+experiments/solver
+experiments/logs
+experiments/wandb
+experiments/lightning_logs
+
+*.csv
+_*.ipynb
+_*.py
 
